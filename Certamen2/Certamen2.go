@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -34,7 +35,12 @@ func (Corr *mesa) comer(C int) {
 
 func main() {
 	chanel := make(chan bool)
-	veces := 2
+
+	fmt.Println("Ingrese la cantidad de veces que se repita el programa: ")
+	var veces string
+	fmt.Scanln(&veces)
+	iveces, _ := strconv.Atoi(veces)
+
 	comensal1 := comensal{nombre: "comensal 1", canal: chanel}
 	comensal2 := comensal{nombre: "comensal 2", canal: chanel}
 	comensal3 := comensal{nombre: "comensal 3", canal: chanel}
@@ -49,7 +55,7 @@ func main() {
 	go comida.comer(3)
 	go comida.comer(4)
 
-	for i := 0; i <= veces; i++ {
+	for i := 0; i < iveces; i++ {
 		comida.reposar(0)
 		comida.reposar(1)
 		comida.reposar(2)
