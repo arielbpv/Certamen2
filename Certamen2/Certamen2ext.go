@@ -1,24 +1,45 @@
 package main
 
-func atencion() {
+import "fmt"
 
+type cajeros struct {
+	atencionCa *chan int
+}
+
+func newCajeros(atencionCa *chan int) *cajeros {
+	return &cajeros{atencionCa: atencionCa}
+}
+
+func (c *cajeros) atencion() {
+	fmt.Println("Nuevo cliente entrando al banco")
+	for {
+		dirige := <-*c.atencionCa
+		fmt.Print("El cliente: ", dirige)
+		fmt.Println("se dirige con el cajero")
+	}
 }
 
 type clientes struct {
-	numero   int
-	atencion bool
+	atencionCli *chan int
+	terminado   *chan bool
 }
 
-func newClientes(numero int, atencion bool) {
+func newClientes(atencionCli *chan int, terminado *chan bool) *clientes {
+	return &clientes{atencionCli: atencionCli, terminado: terminado}
+}
 
+func (cli *clientes) nuevo(max int) {
+	fmt.Println("Nueva atención")
+	for i := 0; i < max; i++ {
+		fmt.Println("El cliente ", i)
+		fmt.Println("está siendo atendido")
+		*cli.atencionCli <- i
+	}
+	*cli.terminado <- true
 }
 
 func main() {
 
-}
-
-type cajeros struct {
-	ocupado bool
 }
 
 /*Deberá crear un framework de simulación con el que deberá programar un ejemplo de simulación de la atención a clientes en un banco (una cola de clientes con múltiples cajeros). En la figura 3 se aprecia una corrutina generadora de clientes, que permite representar sus llegadas al banco. Por otra parte se tiene c cajeros, a los que atienden a los clientes que están en la fila. Los clientes, una vez atendidos, se retiran del banco.
