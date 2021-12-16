@@ -13,8 +13,8 @@ type cajeros struct {
 	atendiendo int
 }
 
-func newCajeros(name int, atendiendo int) *cajeros {
-	return &cajeros{name: name, atendiendo: atendiendo}
+func newCajeros(name int, atendiendo int) cajeros {
+	return cajeros{name: name, atendiendo: atendiendo}
 }
 
 //estructura clientes y creacion
@@ -26,53 +26,100 @@ type clientes struct {
 func newClientes(name int, TiempoAtencionCli int) clientes {
 	return clientes{name: name, TiempoAtencionCli: TiempoAtencionCli}
 }
+/*
+func adding(clienteSlice []clientes, nclientes int) chan int{
+	r := make(chan int)
+
+	go func(){
+		defer close(r)
+		fmt.Println("Nuevo cliente entrando al banco")
+		var demora int
+		demora = rand.Intn(10)
+		clienteSlice = append(clienteSlice, newClientes(nclientes, demora))
+		//clienteSlice = &nuevoClienteSlice
+		nclientes++
+		time.Sleep(time.Second * 15)
+		r <- rand.Intn(10)
+	}()
+	return r
+}
 
 //funcion async para la llegada de clientes a la fila
-func AsyncFila(nclientes int, clienteSlice []clientes) {
-	for {
-		if len(clienteSlice) < 20 {
-			fmt.Println("Nuevo cliente entrando al banco")
-			fmt.Println(len(clienteSlice), cap(clienteSlice))
-			var demora int
-			demora = rand.Intn(10)
-			nuevoClienteSlice := append(clienteSlice, newClientes(nclientes, demora))
-			clienteSlice = nuevoClienteSlice
-			nclientes++
-			time.Sleep(time.Second * 15)
-			//			fmt.Println(len(clienteSlice), cap(clienteSlice))
-		} else {
-			time.Sleep(time.Second * 40)
+//funcion async para la llegada de clientes a la fila
+func AsyncFila(nclientes int, clienteSlice []clientes) <-chan int {
+    //r := make(chan int)
+
+   for i:=0; i<2; i++{
+        if len(clienteSlice) < 20 {
+            go adding(clienteSlice, nclientes)
+            fmt.Println(len(clienteSlice), cap(clienteSlice))
+			//fmt.Println(<-val)
+        }else{
+			fmt.Println(clienteSlice)
 		}
-	}
+    }
+	//return r
+}*/
+
+//funcion async para la llegada de clientes a la fila
+func AsyncFila(nclientes int, clienteSlice []clientes) <-chan int {
+    r := make(chan int)
+
+    //for {
+        if len(clienteSlice) <= 20 {
+            go func() {
+                defer close(r)
+
+                fmt.Println("Nuevo cliente entrando al banco")
+                var demora int
+                demora = rand.Intn(10)
+                nuevoClienteSlice := append(clienteSlice, newClientes(nclientes, demora))
+                clienteSlice = nuevoClienteSlice
+                nclientes++
+                time.Sleep(time.Second * 15)
+                r <- rand.Intn(10)
+            }()
+
+            fmt.Println(len(clienteSlice), cap(clienteSlice))
+        }
+		return r
+   // }
 }
+
 
 //fmt.Println("entre aca")
 //time.Duration(rand.Intn(5))
 
+//el primer cliente en la fila se atiende, avanza la fila
+func popQueue(clienteSlice []clientes) clientes{
+	var aux clientes
+	aux = clienteSlice[0]
+	clienteSlice = clienteSlice[1:]
+	fmt.Printf("El cliente %d sale de la fila\n",aux.name)
+	return aux
+}
+
+func atent(cajero *cajeros, clienteSlice []clientes){
+	if cajero.atendiendo == 1 {
+		var aux = popQueue(clienteSlice)
+		cajero.atendiendo = 0
+		//lo atiende
+		fmt.Printf("El cajero %d, esta atendiendo al cliente %d ", cajero.name, aux.name)
+		//var demoraCajero = aux.TiempoAtencionCli
+		time.Sleep(time.Second * 20)
+		cajero.atendiendo = 1
+		fmt.Printf("\t Cliente satisfecho\n")
+	}/*else{
+		time.Sleep(time.Second * 14)
+	}*/
+}
+
 //atencion a los clientes
-func AsyncAtencion(caja []*cajeros, clienteSlice []clientes) {
+func AsyncAtencion(caja []cajeros, clienteSlice []clientes) {
 	//while true
-	for {
-		var i = 0
-
-		//revisamos que exista un cajero desocupado
-		if caja[i].atendiendo == 0 {
-			caja[i].atendiendo = 1
-			//eliminamos y remplazamos el primer cliente
-			var aux clientes
-			aux = clienteSlice[0]
-			clienteSlice = clienteSlice[1:]
-
-			//lo atiende
-			fmt.Printf("El cajero %d, esta atendiendo al cliente %d \n", caja[i].name, aux.name)
-
-			//var demoraCajero = aux.TiempoAtencionCli
-			time.Sleep(time.Second * 10)
-			caja[i].atendiendo = 0
-		}
-		i++
-		if i > len(caja) {
-			i = 0
+	for j:=0 ; j<200; j++{
+		for i := 0; i < len(caja); i++ {
+			atent(&caja[i], clienteSlice)
 		}
 	}
 }
@@ -87,21 +134,24 @@ func main() {
 	icaja, _ := strconv.Atoi(cajas)
 
 	//se crea el arreglo para guardar los cajeros
-	var ArrCajas []*cajeros
+	var ArrCajas = make([]cajeros, 1)
 
 	//se crean los cajeros
-	for i := 0; i < icaja; i++ {
-		ArrCajas = append(ArrCajas, newCajeros(i, 0))
+	for i := 1; i <= icaja; i++ {
+		ArrCajas = append(ArrCajas, newCajeros(i, 1))
+		fmt.Printf("Se crea el cajero %d con estado %d\n",ArrCajas[i].name, ArrCajas[i].atendiendo)
 	}
 
-	var nclientes = 0
-	var clientes = make([]clientes, 2)
+	var nclientes int = 1
+	var clientes = make([]clientes, 1)
 
-	for {
+	for j:=0; j<100; j++{
 		go AsyncFila(nclientes, clientes)
 		go AsyncAtencion(ArrCajas, clientes)
+		fmt.Println(clientes)
 	}
-
+	fmt.Println(ArrCajas)
+	fmt.Println(clientes)
 }
 
 //C:\Users\ariel\Desktop\GO\src\github.com\arielbpv\certamen2ext

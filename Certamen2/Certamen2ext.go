@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 type cajeros struct {
@@ -15,11 +16,6 @@ func newCajeros(name int) *cajeros {
 
 func (c *cajeros) atencion() {
 	fmt.Println("está siendo atendido")
-	/*for {
-		dirige := <-*c.atencionCa
-		fmt.Print("El cliente: ", dirige)
-		fmt.Println("se dirige con el cajero")
-	}*/
 
 }
 
@@ -33,7 +29,8 @@ func newClientes(name int, TiempoAtencionCli int, terminado chan bool) *clientes
 	return &clientes{name: name, TiempoAtencionCli: TiempoAtencionCli, terminado: terminado}
 }
 
-func (cli *clientes) nuevo(nclientes int, clienteSlice *[]*clientes, max int) {
+func nuevo(nclientes int, clienteSlice *[]*clientes) {
+	time.Sleep(3 * time.Second)
 	var personasNew = rand.Intn(2)
 	for i := 0; i < personasNew; i++ {
 		if len(*clienteSlice) < 20 {
@@ -45,22 +42,47 @@ func (cli *clientes) nuevo(nclientes int, clienteSlice *[]*clientes, max int) {
 		}
 	}
 }
+/*
+func asyncFila(nclientes int, clienteSlice *[]*clientes) chan int{
+	r := make(chan int)
+	var slice []*clientes = *clienteSlice
+	var id int = nclientes
+	fmt.Println("Entrando a la gorutina anonima")
+	
+	
+	go func() {
+		//var randomTime int = 2*rand.Intn(10)
+		defer close(r)
+		fmt.Println("Nuevo cliente entrando al banco")
+		var demora = rand.Intn(10)
+		var terminar = make(chan bool)
+		*slice = append(*slice, newClientes(id, demora, terminar))
+		id = id + 1
+		time.Sleep(15 * time.Second)
+	}()
+
+	fmt.Println("Termina una gorutina")
+	
+	return r
+}*/
 
 func main() {
-	var nclientes = 0
+	var nclientes = 1
 	var clientes [2]*clientes
+	clientes[0] =newClientes(nclientes, rand.Intn(10), make(chan bool))
+	nclientes = nclientes + 1
+	clientes[1] =newClientes(nclientes, rand.Intn(10), make(chan bool))
+	nclientes = nclientes + 1
 	clienteSlice := clientes[0:2]
 
+	nuevo(nclientes, *clienteSlice)
+
+	/*for true{
+		fmt.Println("Itera el while true")
+		nuevo(nclientes, clienteSlice)
+	}*/
 }
 
-/*
-	for i := 0; i < max; i++ {
-		fmt.Println("El cliente ", i)
-		cli.TiempoAtencionCli=1
-	}
-
-	*cli.terminado <- true
-*/
 
 /*Deberá crear un framework de simulación con el que deberá programar un ejemplo de simulación
 de la atención a clientes en un banco (una cola de clientes con múltiples cajeros). En la

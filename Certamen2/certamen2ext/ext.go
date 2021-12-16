@@ -104,13 +104,12 @@ func main() {
 	}
 
 	var nclientes = 0
-	var clientes = make([]clientes, 2)
+	var clientes = make([]clientes, 1)
 
-	fila := AsyncFila(nclientes, clientes)
-	atencion := AsyncAtencion(ArrCajas, clientes)
-	fmt.Println(<-fila)
-	fmt.Println(<-atencion)
-
+	for {
+		go AsyncFila(nclientes, clientes)
+		go AsyncAtencion(ArrCajas, clientes)
+	}
 }
 
 //C:\Users\ariel\Desktop\GO\src\github.com\arielbpv\certamen2ext
