@@ -71,6 +71,9 @@ func (banco *banco) addCajero(cajero cajero){
 func (b *banco) CrearCajeros(Ncajas int) {
 	for i := 0; i < Ncajas; i++ {
 		var aux cajero = newCajero(i+1,make(chan bool))
+		if i==0{ 
+			b.cajeros[0]=aux
+		}
 		b.addCajero(aux)
 	}
 	b.WakeUp()
