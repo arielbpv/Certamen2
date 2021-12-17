@@ -1,128 +1,161 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
 )
 
-// structura cajero y creacion
-type cajeros struct {
+//cajeros
+type cajero struct {
 	name       int
-	atendiendo int
+	atendiendo cliente
+	terminado  chan bool
 }
 
-func newCajeros(name int, atendiendo int) *cajeros {
-	return &cajeros{name: name, atendiendo: atendiendo}
+func newCajero(name int, terminado chan bool) *cajero {
+	return &cajero{name: name, terminado: terminado}
 }
 
-//estructura clientes y creacion
-type clientes struct {
+//clientes
+type cliente struct {
 	name              int
 	TiempoAtencionCli int
 }
 
-func newClientes(name int, TiempoAtencionCli int) clientes {
-	return clientes{name: name, TiempoAtencionCli: TiempoAtencionCli}
+func newCliente(name int, TiempoAtencionCli int, terminado chan bool) *cliente {
+	return &cliente{name: name, TiempoAtencionCli: TiempoAtencionCli}
 }
 
-//funcion async para la llegada de clientes a la fila
-func AsyncFila(nclientes int, clienteSlice []clientes) <-chan int {
-	r := make(chan int)
+//banco
+type banco struct {
+	clientes [20]cliente
+	cajeros  []cajero
+	canal    chan bool
+	last     int
+	ncliente int
+}
 
-	for {
-		if len(clienteSlice) < 20 {
-			go func() {
-				defer close(r)
+func (b *banco) sleep() {
+	<-b.canal
 
-				fmt.Println("Nuevo cliente entrando al banco")
-				var demora int
-				demora = rand.Intn(10)
-				nuevoClienteSlice := append(clienteSlice, newClientes(nclientes, demora))
-				clienteSlice = nuevoClienteSlice
-				nclientes++
-				time.Sleep(time.Second * 15)
-				r <- rand.Intn(10)
-			}()
+}
+func (b *banco) WakeUp() {
+	time.Sleep(1 * time.Second)
+	b.canal <- true
+}
+func (c *cajero) sleep() {
+	<-c.terminado
 
-			fmt.Println(len(clienteSlice), cap(clienteSlice))
-		}
+}
+func (c *cajero) WakeUp() {
+	time.Sleep(1 * time.Second)
+	c.terminado <- true
+}
+
+//funciones
+func (b *banco) CrearCajeros(Ncajas int) {
+	for i := 0; i < Ncajas; i++ {
+		cajero := newCajero(i, make(chan bool))
+		b.cajeros = append(b.cajeros, *cajero)
+		fmt.Printf("se creo el cajero %d \n", b.cajeros[i].name)
 	}
-
+	b.WakeUp()
 }
-
-//time.Duration(rand.Intn(5))
-
-//atencion a los clientes
-func AsyncAtencion(caja []*cajeros, clienteSlice []clientes) <-chan int {
-	r := make(chan int)
-	fmt.Println("entre aca")
-	//while true
+func (b *banco) CrearClientes() {
 	for {
-		var i = 0
-
-		go func() {
-			defer close(r)
-
-			//revisamos que exista un cajero desocupado
-			if caja[i].atendiendo == 0 {
-
-				//eliminamos y remplazamos el primer cliente
-				var aux clientes
-				aux = clienteSlice[0]
-				clienteSlice = clienteSlice[1:]
-
-				//lo atiende
-				fmt.Printf("El cajero %d, esta atendiendo al cliente %d \n", caja[i].name, aux.name)
-				//var demoraCajero = aux.TiempoAtencionCli
-				time.Sleep(time.Second * 10)
+		fmt.Println(b.clientes)
+		if b.last > -1 {
+			var demora = rand.Intn(5)
+			cliente := newCliente(b.ncliente, demora, make(chan bool))
+			if b.last < 20 {
+				b.clientes[b.last] = *cliente
+				b.last++
+				b.ncliente++
+				fmt.Printf("se creo el cliente %d \n", b.clientes[b.last-1].name)
 			}
-		}()
-		i++
-		if i > len(caja) {
-			i = 0
+			b.WakeUp()
+			b.sleep()
+		} else {
+			var demora = rand.Intn(10)
+			cliente := newCliente(b.ncliente, demora, make(chan bool))
+			b.clientes[0] = *cliente
+			b.last = 1
+			b.ncliente = 1
 		}
+	}
+
+}
+func (b *banco) desencola() cliente {
+	var salida cliente
+	if b.last != (0) {
+		for i := 0; i < b.last-1; i++ {
+			if i == 0 {
+				salida = b.clientes[i]
+			}
+			b.clientes[i] = b.clientes[i+1]
+		}
+		b.last--
+	}
+	return salida
+}
+func (b *banco) encola() {
+	if b.last < len(b.clientes) {
+		var demora = rand.Intn(10)
+		cliente := newCliente(b.ncliente, demora, make(chan bool))
+		b.clientes[b.last] = *cliente
+		b.last++
+		b.ncliente++
 	}
 }
 
-//time.Duration(demoraCajero)
+func (b *banco) Atender() {
+	for {
+		for i := 0; i < len(b.cajeros); i++ {
+			var client cliente
+			fmt.Printf("cajero %d \n", b.cajeros[i].name)
+			if b.cajeros[i].atendiendo == client {
+				b.cajeros[i].atendiendo = b.desencola()
+				fmt.Printf("el cajero %d atendiendo al cliente %d \n", b.cajeros[i].name, b.cajeros[i].atendiendo.name)
+			} else {
+
+				if b.cajeros[i].atendiendo.TiempoAtencionCli > 0 {
+					fmt.Printf("restandole tiempo al cliente %d \n", b.cajeros[i].atendiendo.name)
+					b.cajeros[i].atendiendo.TiempoAtencionCli = b.cajeros[i].atendiendo.TiempoAtencionCli - 2
+				} else {
+					fmt.Printf("el cliente %d se retira\n", b.cajeros[i].atendiendo.name)
+					b.cajeros[i].atendiendo = client
+
+				}
+			}
+		}
+		b.WakeUp()
+		b.sleep()
+	}
+}
 
 func main() {
-	//usuario ingresa la cantidad de cajeros
-	fmt.Println("Ingrese la cantidad de cajeros en el programa: ")
-	var cajas string
-	fmt.Scanln(&cajas)
-	icaja, _ := strconv.Atoi(cajas)
+	nCajeros := flag.Int("CrearCajero", 1, "NumCajeros")
+	flag.Parse()
+	var banco banco
+	banco.canal = make(chan bool)
 
-	//se crea el arreglo para guardar los cajeros
-	var ArrCajas []*cajeros
-
-	//se crean los cajeros
-	for i := 0; i < icaja; i++ {
-		ArrCajas = append(ArrCajas, newCajeros(i, 0))
-	}
-
-	var nclientes = 0
-	var clientes = make([]clientes, 1)
+	go banco.CrearCajeros(*nCajeros)
+	banco.sleep()
+	fmt.Println("L147")
+	go banco.CrearClientes()
+	banco.sleep()
+	fmt.Println("L150")
 
 	for {
-		go AsyncFila(nclientes, clientes)
-		go AsyncAtencion(ArrCajas, clientes)
+		for i := 0; i < len(banco.cajeros); i++ {
+			go banco.Atender()
+			banco.sleep()
+			fmt.Println("L156")
+		}
+		banco.WakeUp()
+		banco.sleep()
+		fmt.Println("fin")
 	}
 }
-
-//C:\Users\ariel\Desktop\GO\src\github.com\arielbpv\certamen2ext
-
-/*Deberá crear un framework de simulación con el que deberá programar un ejemplo de simulación
-de la atención a clientes en un banco (una cola de clientes con múltiples cajeros). En la
-figura 3 se aprecia una corrutina generadora de clientes, que permite representar sus llegadas
-al banco. Por otra parte se tiene c cajeros, a los que atienden a los clientes que están en la fila. Los clientes, una vez atendidos, se retiran del banco.
-I)Cajeros cuya pausa en la ejecución permitirá simular el tiempo de atención al cliente
-II) Generador de clientes que simulará la creación de clientes, cuya pausa permite simular el
-tiempo que transcurre entre el arribo de un cliente y otro. Para la ejecución de la simulación
-se debe iterar de forma cíclica sobre una estructura que contiene referencias a las corrutinas
-antes mencionadas. En cada iteración se determinará aleatoriamente (con diferente probabilidad)
-si a la corrutina se la despierta o no, representando de esta forma que los clientes llegan a
-intervalos diferentes de tiempo y que las atenciones de los cajeros pueden variar en tiempo
-también.*/
