@@ -14,8 +14,8 @@ type cajero struct {
 	terminado  chan bool
 }
 
-func newCajero(name int, terminado chan bool) *cajero {
-	return &cajero{name: name, terminado: terminado}
+func newCajero(name int, terminado chan bool) cajero {
+	return cajero{name: name, terminado: terminado}
 }
 
 //clientes
@@ -24,17 +24,24 @@ type cliente struct {
 	TiempoAtencionCli int
 }
 
-func newCliente(name int, TiempoAtencionCli int, terminado chan bool) *cliente {
-	return &cliente{name: name, TiempoAtencionCli: TiempoAtencionCli}
+func newCliente(name int, TiempoAtencionCli int, terminado chan bool) cliente {
+	return cliente{name: name, TiempoAtencionCli: TiempoAtencionCli}
 }
 
 //banco
 type banco struct {
-	clientes [20]cliente
+	clientes []cliente
 	cajeros  []cajero
 	canal    chan bool
 	last     int
 	ncliente int
+}
+
+func (banco *banco) getNcliente() int{
+	return banco.ncliente
+}
+func newBanco(cajeros []cajero, clientes []cliente) *banco{
+	return &banco{cajeros: cajeros, clientes: clientes}
 }
 
 func (b *banco) sleep() {
@@ -55,107 +62,93 @@ func (c *cajero) WakeUp() {
 }
 
 //funciones
+func (banco *banco) addCajero(cajero cajero){
+	//banco.cajas[len(banco.cajas)-1] = cajero;
+  banco.cajeros = append(banco.cajeros, cajero)
+  fmt.Println("Crea al cajero ",cajero.name)
+}
+
 func (b *banco) CrearCajeros(Ncajas int) {
-	for i := 0; i < Ncajas; i++ {
-		cajero := newCajero(i, make(chan bool))
-		b.cajeros = append(b.cajeros, *cajero)
-		fmt.Printf("se creo el cajero %d \n", b.cajeros[i].name)
+	for i := 1; i <= Ncajas; i++ {
+		var aux cajero = newCajero(i,make(chan bool))
+		b.addCajero(aux)
 	}
 	b.WakeUp()
 }
 func (b *banco) CrearClientes() {
 	for {
-		fmt.Println(b.clientes)
-		if b.last > -1 {
-			var demora = rand.Intn(5)
-			cliente := newCliente(b.ncliente, demora, make(chan bool))
-			if b.last < 20 {
-				b.clientes[b.last] = *cliente
-				b.last++
-				b.ncliente++
-				fmt.Printf("se creo el cliente %d \n", b.clientes[b.last-1].name)
-			}
-			b.WakeUp()
-			b.sleep()
-		} else {
-			var demora = rand.Intn(10)
-			cliente := newCliente(b.ncliente, demora, make(chan bool))
-			b.clientes[0] = *cliente
-			b.last = 1
-			b.ncliente = 1
-		}
-	}
-
-}
-func (b *banco) desencola() cliente {
-	var salida cliente
-	if b.last != (0) {
-		for i := 0; i < b.last-1; i++ {
-			if i == 0 {
-				salida = b.clientes[i]
-			}
-			b.clientes[i] = b.clientes[i+1]
-		}
-		b.last--
-	}
-	return salida
-}
-func (b *banco) encola() {
-	if b.last < len(b.clientes) {
-		var demora = rand.Intn(10)
-		cliente := newCliente(b.ncliente, demora, make(chan bool))
-		b.clientes[b.last] = *cliente
-		b.last++
-		b.ncliente++
-	}
-}
-
-func (b *banco) Atender() {
-	for {
-		for i := 0; i < len(b.cajeros); i++ {
-			var client cliente
-			fmt.Printf("cajero %d \n", b.cajeros[i].name)
-			if b.cajeros[i].atendiendo == client {
-				b.cajeros[i].atendiendo = b.desencola()
-				fmt.Printf("el cajero %d atendiendo al cliente %d \n", b.cajeros[i].name, b.cajeros[i].atendiendo.name)
-			} else {
-
-				if b.cajeros[i].atendiendo.TiempoAtencionCli > 0 {
-					fmt.Printf("restandole tiempo al cliente %d \n", b.cajeros[i].atendiendo.name)
-					b.cajeros[i].atendiendo.TiempoAtencionCli = b.cajeros[i].atendiendo.TiempoAtencionCli - 2
-				} else {
-					fmt.Printf("el cliente %d se retira\n", b.cajeros[i].atendiendo.name)
-					b.cajeros[i].atendiendo = client
-
-				}
-			}
-		}
+		b.encola()
 		b.WakeUp()
 		b.sleep()
 	}
 }
+func (b *banco) desencola() cliente {
+	var salida cliente
+	salida = b.clientes[0]
+	b.clientes = b.clientes[1:]
+	fmt.Printf("El cliente %d sale de la fila\n", salida.name)
+	return salida
+
+}
+
+func (banco *banco) addCliente(cliente cliente){
+
+	banco.clientes = append(banco.clientes, cliente)
+	banco.ncliente = banco.ncliente + 1
+	fmt.Println("Crea al cliente ",cliente.name)
+
+}
+
+func (b *banco) encola() {
+	if(b.ncliente != 0){
+		var aux cliente = newCliente(b.ncliente, rand.Intn(10)+1, make(chan bool))
+   		b.addCliente(aux)
+	}else{
+		b.ncliente = b.ncliente+1
+	}
+}
+
+func (c *cajero) Atender(b *banco) {
+	c.atendiendo = b.desencola()
+	if c.atendiendo.name != 0{
+		fmt.Printf("el cajero %d atendiendo al cliente %d \n", c.name, c.atendiendo.name)
+
+		for i := c.atendiendo.TiempoAtencionCli; i > 0; i-- {
+			if c.atendiendo.TiempoAtencionCli > 0 {
+				time.Sleep(time.Second * 1)
+				c.atendiendo.TiempoAtencionCli = c.atendiendo.TiempoAtencionCli - 1
+			}
+		}
+		fmt.Printf("El cliente %d fue atendido y se retira del banco\n", c.atendiendo.name)
+	}
+	b.WakeUp()
+	c.sleep()
+}
+
 
 func main() {
 	nCajeros := flag.Int("CrearCajero", 1, "NumCajeros")
 	flag.Parse()
-	var banco banco
+
+	CajerosArray := make([]cajero,1)
+	SliceCajeros := CajerosArray
+	ClientesArray := make([]cliente,1)
+	SliceClientes := ClientesArray
+
+	banco := newBanco(SliceCajeros, SliceClientes)
 	banco.canal = make(chan bool)
 
 	go banco.CrearCajeros(*nCajeros)
 	banco.sleep()
-	fmt.Println("L147")
 	go banco.CrearClientes()
 	banco.sleep()
-	fmt.Println("L150")
 
 	for {
 		for i := 0; i < len(banco.cajeros); i++ {
-			go banco.Atender()
+			go banco.cajeros[i].Atender(banco)
 			banco.sleep()
-			fmt.Println("L156")
 		}
 		banco.WakeUp()
 		banco.sleep()
-		fmt.Println("fin")
 	}
 }
